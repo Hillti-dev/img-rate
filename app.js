@@ -12,22 +12,6 @@ const localImages = [
   }
 ];
 
-const { data } = await supabase.auth.getUser();
-console.log(data.user);
-if (data.user) {
-  showUploadPage();
-}
-
-const { data } = await supabase.auth.getUser();
-console.log(data.user);
-
-const { data, error } = await supabase.storage
-  .from('images')
-  .upload(filename, file);
-
-console.log(error);
-
-
 let currentImageList = [...localImages];
 let history = [];
 let historyIndex = -1;
@@ -67,6 +51,7 @@ const adminUsers = document.getElementById("adminUsers");
 
 let uploadMetaDisabled = false;
 let ratingTableMissing = false;
+let fallbackUploads = [];
 
 function isAdmin(user = currentUser) {
   const username = user?.user_metadata?.username;
@@ -305,13 +290,13 @@ async function ensureProfileRecord() {
 async function refreshUploadSection() {
   if (!currentUser) return;
   const uploads = await fetchUserUploads();
-  renderUploadsList(uploads);
+  renderUploadsList([...uploads, ...fallbackUploads]);
 }
 
 async function refreshImageSource() {
   if (currentUser) {
     const uploads = await fetchUserUploads();
-    currentImageList = uploads.length ? uploads : [...localImages];
+    currentImageList = uploads.length || fallbackUploads.length ? [...uploads, ...fallbackUploads] : [...localImages];
   } else {
     currentImageList = [...localImages];
   }
@@ -330,6 +315,7 @@ async function fetchUserUploads() {
 
   if (error) {
     console.warn("Upload-Liste konnte nicht geladen werden:", error.message);
+    setUploadMessage("Uploads können nicht geladen werden: " + (error.message || "Fehler"), true);
     return [];
   }
 
@@ -419,9 +405,21 @@ async function handleUpload(event) {
   });
 
   if (error) {
-    const message = error.message?.includes("row-level security")
-      ? "Upload fehlgeschlagen: Supabase Storage-Policy verhindert den Upload. Bitte überprüfe die Bucket-Richtlinien für 'images'."
-      : `Upload fehlgeschlagen: ${error.message}`;
+    if (error.message?.includes("row-level security")) {
+      const objectUrl = URL.createObjectURL(file);
+      fallbackUploads.push({
+        name: filename,
+        path: `uploads/local/${filename}`,
+        url: objectUrl,
+        storage: false,
+      });
+      setUploadMessage("Upload fehlgeschlagen: Supabase Storage-Policy verhindert den Upload. Datei wird lokal angezeigt.");
+      await refreshUploadSection();
+      await refreshImageSource();
+      return;
+    }
+
+    const message = `Upload fehlgeschlagen: ${error.message}`;
     setUploadMessage(message, true);
     return;
   }
