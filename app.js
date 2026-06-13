@@ -17,23 +17,16 @@ const nextBtn = document.getElementById("nextBtn");
 const settingsBtn = document.getElementById("settingsBtn");
 const closeSettings = document.getElementById("closeSettings");
 const settingsOverlay = document.getElementById("settingsOverlay");
-const themeInputs = document.querySelectorAll("input[name=theme]");
+const themeToggle = document.getElementById("themeToggle");
 
 function applyTheme(theme) {
     document.documentElement.dataset.theme = theme;
-    if (theme === "light") {
-        document.documentElement.classList.add("light");
-    } else {
-        document.documentElement.classList.remove("light");
-    }
 }
 
 function loadTheme() {
     const saved = localStorage.getItem("preferredTheme") || "dark";
+    themeToggle.checked = saved === "light";
     applyTheme(saved);
-    themeInputs.forEach(input => {
-        input.checked = input.value === saved;
-    });
 }
 
 function selectRandomImage() {
@@ -60,10 +53,18 @@ function pushHistory(image) {
 function showImage(image) {
     currentImage = image;
     imageEl.src = image;
-    imageCaption.textContent = `Bild ${historyIndex + 1} von ${history.length}`;
+    imageCaption.textContent = "Lade Bild…";
     loadRating();
     updateNavButtons();
 }
+
+imageEl.addEventListener("load", () => {
+    imageCaption.textContent = `Bild ${historyIndex + 1} von ${history.length}`;
+});
+
+imageEl.addEventListener("error", () => {
+    imageCaption.textContent = "Bild kann nicht angezeigt werden. Konvertiere die Datei zu PNG oder JPG.";
+});
 
 function updateNavButtons() {
     prevBtn.disabled = historyIndex <= 0;
@@ -125,13 +126,10 @@ settingsOverlay.addEventListener("click", event => {
     }
 });
 
-themeInputs.forEach(input => {
-    input.addEventListener("change", () => {
-        if (input.checked) {
-            applyTheme(input.value);
-            localStorage.setItem("preferredTheme", input.value);
-        }
-    });
+themeToggle.addEventListener("change", () => {
+    const selected = themeToggle.checked ? "light" : "dark";
+    applyTheme(selected);
+    localStorage.setItem("preferredTheme", selected);
 });
 
 document.querySelectorAll("#stars span").forEach(star => {

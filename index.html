@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Bildbewertung</title>
     <link rel="stylesheet" href="style.css">
+    <meta name="owner" content="Hillti">
+    <meta name="developer" content="Hillti">
+    <meta name="author" content="Hillti">
+    <meta name="description" content="Bildbewertung"> 
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes"> 
 </head>
 <body>
 
@@ -51,17 +58,13 @@
             <button id="closeSettings" class="icon-btn" aria-label="Schließen">✕</button>
         </div>
 
-        <div class="setting-row">
-            <label>
-                <input type="radio" name="theme" value="dark" checked>
-                Dunkelmodus
+        <div class="setting-row toggle-row">
+            <span class="theme-label">Darkmode</span>
+            <label class="switch">
+                <input id="themeToggle" type="checkbox" checked>
+                <span class="slider"></span>
             </label>
-        </div>
-        <div class="setting-row">
-            <label>
-                <input type="radio" name="theme" value="light">
-                Hellmodus
-            </label>
+            <span class="theme-label">Lightmode</span>
         </div>
     </div>
 </div>
