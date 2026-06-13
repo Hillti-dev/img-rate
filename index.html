@@ -2,25 +2,69 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Bildbewertung</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<h1>Bildbewertung</h1>
+<div class="app-shell">
+    <header class="topbar">
+        <button id="settingsBtn" class="icon-btn" aria-label="Einstellungen">⚙</button>
+        <div class="title-wrap">
+            <p class="eyebrow">Bildbewertung</p>
+            <h1>Schwarz-Weiß Galerie</h1>
+        </div>
+    </header>
 
-<img id="image" src="" alt="Bild">
+    <main>
+        <section class="image-frame">
+            <img id="image" src="" alt="Zufälliges Bild aus der Galerie">
+            <div class="image-caption" id="imageCaption">Lade Bild…</div>
+        </section>
 
-<div id="stars">
-    <span data-rating="1">★</span>
-    <span data-rating="2">★</span>
-    <span data-rating="3">★</span>
-    <span data-rating="4">★</span>
-    <span data-rating="5">★</span>
+        <div class="rating-panel">
+            <div id="stars" class="stars">
+                <span data-rating="1">★</span>
+                <span data-rating="2">★</span>
+                <span data-rating="3">★</span>
+                <span data-rating="4">★</span>
+                <span data-rating="5">★</span>
+            </div>
+            <div class="rating-info" id="ratingInfo">Keine Bewertung</div>
+        </div>
+
+        <div class="controls">
+            <button id="prevBtn" class="control-btn">Zurück</button>
+            <button id="nextBtn" class="control-btn">Nächstes Bild</button>
+        </div>
+    </main>
 </div>
 
-<button id="nextBtn">Nächstes Bild</button>
+<div id="settingsOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="settings-panel">
+        <div class="settings-header">
+            <div>
+                <p class="eyebrow">Einstellungen</p>
+                <h2 id="settingsTitle">Design</h2>
+            </div>
+            <button id="closeSettings" class="icon-btn" aria-label="Schließen">✕</button>
+        </div>
+
+        <div class="setting-row">
+            <label>
+                <input type="radio" name="theme" value="dark" checked>
+                Dunkelmodus
+            </label>
+        </div>
+        <div class="setting-row">
+            <label>
+                <input type="radio" name="theme" value="light">
+                Hellmodus
+            </label>
+        </div>
+    </div>
+</div>
 
 <script src="app.js"></script>
 
