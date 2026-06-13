@@ -1,0 +1,31 @@
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    margin: 20px;
+}
+
+img {
+    max-width: 95%;
+    max-height: 70vh;
+    border-radius: 10px;
+}
+
+#stars {
+    margin-top: 20px;
+    font-size: 40px;
+}
+
+#stars span {
+    cursor: pointer;
+    color: lightgray;
+}
+
+#stars span.active {
+    color: gold;
+}
+
+button {
+    margin-top: 20px;
+    font-size: 18px;
+    padding: 10px 20px;
+}
