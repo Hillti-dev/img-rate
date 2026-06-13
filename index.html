@@ -8,10 +8,11 @@
     <meta name="owner" content="Hillti">
     <meta name="developer" content="Hillti">
     <meta name="author" content="Hillti">
-    <meta name="description" content="Bildbewertung"> 
+    <meta name="description" content="Bildbewertung">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="mobile-web-app-capable" content="yes"> 
+    <meta name="mobile-web-app-capable" content="yes">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 </head>
 <body>
 
@@ -22,12 +23,18 @@
             <p class="eyebrow">Bildbewertung</p>
             <h1>Bewertung</h1>
         </div>
+        <div class="topbar-actions">
+            <span id="userStatus" class="user-chip">Gast</span>
+            <button id="loginBtn" class="control-btn">Anmelden</button>
+            <button id="logoutBtn" class="control-btn hidden">Abmelden</button>
+            <button id="adminBtn" class="control-btn hidden">Admin</button>
+        </div>
     </header>
 
     <main>
         <section class="image-frame">
             <img id="image" src="" alt="Zufälliges Bild">
-            <div class="image-caption" id="imageCaption">Lade Bild…</div>
+            <div class="image-caption" id="imageCaption">Bild wird geladen…</div>
         </section>
 
         <div class="rating-panel">
@@ -38,13 +45,32 @@
                 <span data-rating="4">★</span>
                 <span data-rating="5">★</span>
             </div>
-            <div class="rating-info" id="ratingInfo">Keine Bewertung</div>
+            <div class="rating-meta">
+                <div class="rating-info" id="ratingInfo">Noch nicht bewertet</div>
+                <div class="avg-rating" id="avgRating">Durchschnitt: -</div>
+            </div>
         </div>
 
         <div class="controls">
             <button id="prevBtn" class="control-btn">Zurück</button>
             <button id="nextBtn" class="control-btn">Nächstes Bild</button>
         </div>
+
+        <section id="uploadSection" class="upload-section hidden">
+            <div class="upload-header">
+                <div>
+                    <p class="eyebrow">Upload</p>
+                    <h2>Meine Uploads</h2>
+                </div>
+            </div>
+            <form id="uploadForm" class="upload-form">
+                <label class="input-label" for="uploadFile">Bild auswählen</label>
+                <input id="uploadFile" type="file" accept="image/*">
+                <button type="submit" class="control-btn">Hochladen</button>
+            </form>
+            <div id="uploadMessage" class="form-message hidden"></div>
+            <div id="uploadsList" class="uploads-list"></div>
+        </section>
     </main>
 </div>
 
@@ -59,12 +85,71 @@
         </div>
 
         <div class="setting-row toggle-row">
-            <span class="theme-label">Darkmode</span>
+            <span class="theme-label">darkmode</span>
             <label class="switch">
                 <input id="themeToggle" type="checkbox" checked>
                 <span class="slider"></span>
             </label>
-            <span class="theme-label">Lightmode</span>
+            <span class="theme-label">lightmode</span>
+        </div>
+    </div>
+</div>
+
+<div id="authOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="auth-panel">
+        <div class="auth-header">
+            <div>
+                <p class="eyebrow">Login</p>
+                <h2 id="authTitle">Anmelden oder registrieren</h2>
+            </div>
+            <button id="closeAuth" class="icon-btn" aria-label="Schließen">✕</button>
+        </div>
+
+        <div class="auth-tabs">
+            <button id="authTabLogin" class="tab-button active">Anmelden</button>
+            <button id="authTabRegister" class="tab-button">Registrieren</button>
+        </div>
+
+        <form id="loginForm" class="auth-form">
+            <label class="input-label" for="loginEmail">E-Mail</label>
+            <input id="loginEmail" type="email" placeholder="E-Mail" required>
+            <label class="input-label" for="loginPassword">Passwort</label>
+            <input id="loginPassword" type="password" placeholder="Passwort" required>
+            <button type="submit" class="control-btn">Anmelden</button>
+        </form>
+
+        <form id="registerForm" class="auth-form hidden">
+            <label class="input-label" for="registerName">Benutzername</label>
+            <input id="registerName" type="text" placeholder="Benutzername" required>
+            <label class="input-label" for="registerEmail">E-Mail</label>
+            <input id="registerEmail" type="email" placeholder="E-Mail" required>
+            <label class="input-label" for="registerPassword">Passwort</label>
+            <input id="registerPassword" type="password" placeholder="Passwort" required>
+            <button type="submit" class="control-btn">Registrieren</button>
+        </form>
+
+        <div id="authMessage" class="form-message"></div>
+    </div>
+</div>
+
+<div id="adminOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
+    <div class="admin-panel">
+        <div class="admin-header">
+            <div>
+                <p class="eyebrow">Admin</p>
+                <h2 id="adminTitle">Verwaltung</h2>
+            </div>
+            <button id="closeAdmin" class="icon-btn" aria-label="Schließen">✕</button>
+        </div>
+
+        <div class="admin-section">
+            <h3>Alle Uploads</h3>
+            <div id="adminUploads" class="admin-list"></div>
+        </div>
+
+        <div class="admin-section">
+            <h3>Alle Benutzer</h3>
+            <div id="adminUsers" class="admin-list"></div>
         </div>
     </div>
 </div>
