@@ -12,6 +12,22 @@ const localImages = [
   }
 ];
 
+const { data } = await supabase.auth.getUser();
+console.log(data.user);
+if (data.user) {
+  showUploadPage();
+}
+
+const { data } = await supabase.auth.getUser();
+console.log(data.user);
+
+const { data, error } = await supabase.storage
+  .from('images')
+  .upload(filename, file);
+
+console.log(error);
+
+
 let currentImageList = [...localImages];
 let history = [];
 let historyIndex = -1;
@@ -48,6 +64,9 @@ const adminOverlay = document.getElementById("adminOverlay");
 const closeAdmin = document.getElementById("closeAdmin");
 const adminUploads = document.getElementById("adminUploads");
 const adminUsers = document.getElementById("adminUsers");
+
+let uploadMetaDisabled = false;
+let ratingTableMissing = false;
 
 function isAdmin(user = currentUser) {
   const username = user?.user_metadata?.username;
@@ -251,10 +270,12 @@ async function handleRegister(event) {
     return;
   }
 
-  if (data.user) {
-    setMessage("Registriert! Bitte E-Mail bestätigen.");
+  setMessage("Registriert! Bitte E-Mail bestätigen.");
+  if (data.session) {
     hideAuthPanel();
     await handleAuthState(data.user);
+  } else {
+    await handleAuthState(null);
   }
 }
 
@@ -398,11 +419,14 @@ async function handleUpload(event) {
   });
 
   if (error) {
-    setUploadMessage(`Upload fehlgeschlagen: ${error.message}`, true);
+    const message = error.message?.includes("row-level security")
+      ? "Upload fehlgeschlagen: Supabase Storage-Policy verhindert den Upload. Bitte überprüfe die Bucket-Richtlinien für 'images'."
+      : `Upload fehlgeschlagen: ${error.message}`;
+    setUploadMessage(message, true);
     return;
   }
 
-  await supabaseClient.from("image_uploads").insert([
+  const { error: insertError } = await supabaseClient.from("image_uploads").insert([
     {
       user_id: currentUser.id,
       username: currentUser.user_metadata?.username || null,
@@ -412,7 +436,14 @@ async function handleUpload(event) {
     },
   ]);
 
-  setUploadMessage("Bild erfolgreich hochgeladen.");
+  if (insertError) {
+    uploadMetaDisabled = true;
+    console.warn("Upload-Metadaten konnten nicht gespeichert werden:", insertError.message);
+    setUploadMessage("Bild hochgeladen, Metadaten konnten nicht gespeichert werden.");
+  } else {
+    setUploadMessage("Bild erfolgreich hochgeladen.");
+  }
+
   uploadFile.value = "";
   await refreshUploadSection();
   await refreshImageSource();
@@ -589,8 +620,16 @@ async function loadAverageRating() {
     return;
   }
 
+  if (ratingTableMissing) {
+    avgRatingEl.textContent = "Durchschnitt: nicht verfügbar";
+    return;
+  }
+
   const { data, error } = await supabaseClient.from("image_ratings").select("rating").eq("image_path", currentImage.path);
   if (error || !data) {
+    if (error?.message?.includes("Could not find the table") || error?.message?.includes("table 'public.image_ratings'")) {
+      ratingTableMissing = true;
+    }
     avgRatingEl.textContent = "Durchschnitt: nicht verfügbar";
     return;
   }
@@ -605,14 +644,15 @@ async function loadAverageRating() {
 }
 
 async function saveRating(ratingValue) {
-  if (!currentImage?.path || !currentUser) {
-    ratings[currentImage?.path] = Number(ratingValue);
-    updateStars(Number(ratingValue));
-    updateRatingDisplay(Number(ratingValue));
+  const rating = Number(ratingValue);
+
+  if (!currentImage?.path || !currentUser || ratingTableMissing) {
+    ratings[currentImage?.path] = rating;
+    updateStars(rating);
+    updateRatingDisplay(rating);
     return;
   }
 
-  const rating = Number(ratingValue);
   const { error } = await supabaseClient.from("image_ratings").upsert({
     user_id: currentUser.id,
     image_path: currentImage.path,
@@ -620,6 +660,13 @@ async function saveRating(ratingValue) {
   }, { onConflict: ["user_id", "image_path"] });
 
   if (error) {
+    if (error.message?.includes("Could not find the table") || error.message?.includes("table 'public.image_ratings'") || error.message?.includes("row-level security")) {
+      ratingTableMissing = true;
+      ratings[currentImage?.path] = rating;
+      updateStars(rating);
+      updateRatingDisplay(rating);
+      return;
+    }
     console.warn("Bewertung konnte nicht gespeichert werden:", error.message);
     return;
   }
