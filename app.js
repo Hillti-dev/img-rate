@@ -1,7 +1,5 @@
 const images = [
-    "images/bild1.jpg",
-    "images/bild2.jpg",
-    "images/bild3.jpg"
+    "images/IMG_4645.jpg"
 ];
 
 const ratings = {};
