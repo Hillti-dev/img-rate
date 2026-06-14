@@ -69,6 +69,32 @@ await supabase
   });
 
 
+
+const { data, error } = await supabase
+  .from('images_uploads')
+  .select('*');
+
+console.log(data);
+console.log(error);
+
+const publicUrl = data.publicUrl;
+
+
+const { error } = await supabase
+  .from('image_uploads')
+  .insert([
+    {
+      image_url: publicUrl
+    }
+  ]);
+
+
+const { data } = supabase.storage
+  .from('images')
+  .getPublicUrl(filePath);
+
+
+
 function isAdmin(user = currentUser) {
   const username = user?.user_metadata?.username;
   return username === "Hillti" || username?.toLowerCase() === "hillti";
@@ -188,6 +214,7 @@ function attachEventHandlers() {
 
   uploadsList.addEventListener("click", handleUploadsClick);
   adminUploads.addEventListener("click", handleAdminUploadsClick);
+  adminUsers.addEventListener("click", handleAdminUsersClick);
   prevBtn.addEventListener("click", previousImage);
   nextBtn.addEventListener("click", randomImage);
 }
@@ -472,12 +499,51 @@ async function handleUpload(event) {
   await refreshImageSource();
 }
 
+async function handleAdminUsersClick(event) {
+  const button = event.target.closest(".admin-user-delete");
+  if (!button) return;
+  const userId = button.dataset.userId;
+  if (!userId) return;
+  if (!window.confirm("Benutzer wirklich löschen?")) return;
+  await deleteUser(userId);
+  await loadAdminDashboard();
+}
+
 async function handleAdminUploadsClick(event) {
   const button = event.target.closest(".admin-delete");
   if (!button) return;
   const path = button.dataset.path;
   await deleteUpload(path);
   await loadAdminDashboard();
+}
+
+async function deleteUser(userId) {
+  if (!userId) return;
+
+  const { error: deleteMetadataError } = await supabaseClient.from("image_uploads").delete().eq("user_id", userId);
+  if (deleteMetadataError) {
+    console.warn("Upload-Metadaten des Benutzers konnten nicht gelöscht werden:", deleteMetadataError.message);
+  }
+
+  const { data: storedFiles, error: listError } = await supabaseClient.storage.from("images").list(`uploads/${userId}`, {
+    limit: 100,
+  });
+  if (!listError && storedFiles?.length) {
+    const paths = storedFiles
+      .filter(item => item.name && !item.name.endsWith("/"))
+      .map(item => `uploads/${userId}/${item.name}`);
+    if (paths.length) {
+      const { error: storageDeleteError } = await supabaseClient.storage.from("images").remove(paths);
+      if (storageDeleteError) {
+        console.warn("Storage-Dateien des Benutzers konnten nicht gelöscht werden:", storageDeleteError.message);
+      }
+    }
+  }
+
+  const { error } = await supabaseClient.from("profiles").delete().eq("id", userId);
+  if (error) {
+    console.warn("Benutzer konnte nicht gelöscht werden:", error.message);
+  }
 }
 
 async function loadAdminDashboard() {
@@ -567,6 +633,7 @@ async function loadAdminUsers() {
               <strong>${profile.username || profile.email}</strong>
               <p class="avg-rating">${profile.email}</p>
             </div>
+            <button class="control-btn admin-user-delete" data-user-id="${profile.id}">Löschen</button>
           </div>
         </div>
       `;
