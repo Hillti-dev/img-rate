@@ -54,47 +54,6 @@ let ratingTableMissing = false;
 let profilesTableMissing = false;
 let fallbackUploads = [];
 
-
-// 1. Datei hochladen
-await supabase.storage
-  .from('images')
-  .upload(path, file);
-
-// 2. URL in Tabelle speichern
-await supabase
-  .from('images')
-  .insert({
-    image_url: url,
-    user_id: user.id
-  });
-
-
-
-const { data, error } = await supabase
-  .from('images_uploads')
-  .select('*');
-
-console.log(data);
-console.log(error);
-
-const publicUrl = data.publicUrl;
-
-
-const { error } = await supabase
-  .from('image_uploads')
-  .insert([
-    {
-      image_url: publicUrl
-    }
-  ]);
-
-
-const { data } = supabase.storage
-  .from('images')
-  .getPublicUrl(filePath);
-
-
-
 function isAdmin(user = currentUser) {
   const username = user?.user_metadata?.username;
   return username === "Hillti" || username?.toLowerCase() === "hillti";
@@ -346,47 +305,53 @@ async function refreshUploadSection() {
 }
 
 async function refreshImageSource() {
-  if (currentUser) {
-    const uploads = await fetchUserUploads();
-    currentImageList = uploads.length || fallbackUploads.length ? [...uploads, ...fallbackUploads] : [...localImages];
-  } else {
-    currentImageList = [...localImages];
-  }
+  const uploads = await fetchGalleryUploads();
+  currentImageList = uploads.length || fallbackUploads.length ? [...uploads, ...fallbackUploads] : [...localImages];
   history = [];
   historyIndex = -1;
   randomImage();
 }
 
-async function fetchUserUploads() {
-  if (!currentUser) return [];
-  const prefix = `uploads/${currentUser.id}`;
-  const { data, error } = await supabaseClient.storage.from("images").list(prefix, {
-    limit: 100,
-    sortBy: { column: "name", order: "desc" },
-  });
+async function fetchGalleryUploads() {
+  const { data, error } = await supabaseClient
+    .from("image_uploads")
+    .select("image_path, file_name, created_at");
 
   if (error) {
-    console.warn("Upload-Liste konnte nicht geladen werden:", error.message);
+    console.warn("Upload-Metadaten konnten nicht geladen werden:", error.message);
     setUploadMessage("Uploads können nicht geladen werden: " + (error.message || "Fehler"), true);
     return [];
   }
 
   const uploads = [];
-  for (const item of data || []) {
-    if (item.name.endsWith("/")) continue;
-    const filePath = `${prefix}/${item.name}`;
-    const { data: urlData, error: urlError } = await supabaseClient.storage
+  for (const row of data || []) {
+    const filePath = row.image_path;
+    const fileName = row.file_name || filePath.split("/").pop();
+    let url = null;
+
+    const { data: signedUrlData, error: signError } = await supabaseClient.storage
       .from("images")
       .createSignedUrl(filePath, 3600);
 
-    if (!urlError && urlData?.signedUrl) {
-      uploads.push({
-        name: item.name,
-        path: filePath,
-        url: urlData.signedUrl,
-        storage: true,
-      });
+    if (!signError && signedUrlData?.signedUrl) {
+      url = signedUrlData.signedUrl;
+    } else {
+      const { data: publicUrlData, error: publicError } = supabaseClient.storage
+        .from("images")
+        .getPublicUrl(filePath);
+      if (!publicError && publicUrlData?.publicUrl) {
+        url = publicUrlData.publicUrl;
+      }
     }
+
+    if (!url) continue;
+
+    uploads.push({
+      name: fileName,
+      path: filePath,
+      url,
+      storage: true,
+    });
   }
 
   return uploads;
@@ -553,10 +518,10 @@ async function loadAdminDashboard() {
 
 async function loadAdminUploads() {
   adminUploads.innerHTML = "<p class='form-message'>Lade Uploads...</p>";
-  const { data, error } = await supabaseClient.storage.from("images").list("uploads", {
-    limit: 100,
-    sortBy: { column: "name", order: "asc" },
-  });
+  const { data, error } = await supabaseClient
+    .from("image_uploads")
+    .select("image_path, file_name, user_id, created_at")
+    .order("created_at", { ascending: false });
 
   if (error) {
     adminUploads.innerHTML = `<p class='form-message'>Uploads können nicht geladen werden: ${error.message}</p>`;
@@ -564,18 +529,12 @@ async function loadAdminUploads() {
   }
 
   const cards = [];
-  for (const folder of data || []) {
-    if (!folder.name) continue;
-    const folderPath = `uploads/${folder.name}`;
-    const { data: files } = await supabaseClient.storage.from("images").list(folderPath, {
-      limit: 50,
-      sortBy: { column: "name", order: "desc" },
+  for (const record of data || []) {
+    cards.push({
+      userId: record.user_id,
+      path: record.image_path,
+      name: record.file_name || record.image_path.split("/").pop(),
     });
-
-    for (const item of files || []) {
-      const filePath = `${folderPath}/${item.name}`;
-      cards.push({ userId: folder.name, path: filePath, name: item.name });
-    }
   }
 
   if (!cards.length) {
