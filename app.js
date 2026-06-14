@@ -306,7 +306,10 @@ async function refreshUploadSection() {
 
 async function refreshImageSource() {
   const uploads = await fetchGalleryUploads();
-  currentImageList = uploads.length || fallbackUploads.length ? [...uploads, ...fallbackUploads] : [...localImages];
+  currentImageList = uploads.length ? [...uploads] : [...localImages];
+  if (fallbackUploads.length) {
+    currentImageList = [...uploads, ...fallbackUploads];
+  }
   history = [];
   historyIndex = -1;
   randomImage();
@@ -315,7 +318,7 @@ async function refreshImageSource() {
 async function fetchGalleryUploads() {
   const { data, error } = await supabaseClient
     .from("image_uploads")
-    .select("image_path, file_name, created_at");
+    .select("image_path, file_name, created_at, username, email, user_id");
 
   if (error) {
     console.warn("Upload-Metadaten konnten nicht geladen werden:", error.message);
@@ -351,6 +354,7 @@ async function fetchGalleryUploads() {
       path: filePath,
       url,
       storage: true,
+      uploader: row.username || row.email || row.user_id || "Unbekannt",
     });
   }
 
@@ -520,7 +524,7 @@ async function loadAdminUploads() {
   adminUploads.innerHTML = "<p class='form-message'>Lade Uploads...</p>";
   const { data, error } = await supabaseClient
     .from("image_uploads")
-    .select("image_path, file_name, user_id, created_at")
+    .select("image_path, file_name, user_id, username, email, created_at")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -531,6 +535,7 @@ async function loadAdminUploads() {
   const cards = [];
   for (const record of data || []) {
     cards.push({
+      uploader: record.username || record.email || record.user_id || "Unbekannt",
       userId: record.user_id,
       path: record.image_path,
       name: record.file_name || record.image_path.split("/").pop(),
@@ -549,7 +554,7 @@ async function loadAdminUploads() {
           <div class="card-row">
             <div>
               <strong>${record.name}</strong>
-              <p class="avg-rating">Uploader: ${record.userId}</p>
+              <p class="avg-rating">Uploader: ${record.uploader}</p>
             </div>
             <button class="control-btn admin-delete" data-path="${record.path}">Löschen</button>
           </div>
@@ -585,6 +590,7 @@ async function loadAdminUsers() {
 
   adminUsers.innerHTML = data
     .map(profile => {
+      const isSelf = currentUser?.id === profile.id;
       return `
         <div class="admin-card">
           <div class="card-row">
@@ -592,7 +598,7 @@ async function loadAdminUsers() {
               <strong>${profile.username || profile.email}</strong>
               <p class="avg-rating">${profile.email}</p>
             </div>
-            <button class="control-btn admin-user-delete" data-user-id="${profile.id}">Löschen</button>
+            ${isSelf ? `<span class="user-tag">Du</span>` : `<button class="control-btn admin-user-delete" data-user-id="${profile.id}">Löschen</button>`}
           </div>
         </div>
       `;
