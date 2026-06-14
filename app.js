@@ -51,7 +51,23 @@ const adminUsers = document.getElementById("adminUsers");
 
 let uploadMetaDisabled = false;
 let ratingTableMissing = false;
+let profilesTableMissing = false;
 let fallbackUploads = [];
+
+
+// 1. Datei hochladen
+await supabase.storage
+  .from('images')
+  .upload(path, file);
+
+// 2. URL in Tabelle speichern
+await supabase
+  .from('images')
+  .insert({
+    image_url: url,
+    user_id: user.id
+  });
+
 
 function isAdmin(user = currentUser) {
   const username = user?.user_metadata?.username;
@@ -275,9 +291,9 @@ async function handleLogout() {
 }
 
 async function ensureProfileRecord() {
-  if (!currentUser) return;
+  if (!currentUser || profilesTableMissing) return;
   const username = currentUser.user_metadata?.username || currentUser.email?.split("@")[0] || "Benutzer";
-  await supabaseClient.from("profiles").upsert([
+  const { error } = await supabaseClient.from("profiles").upsert([
     {
       id: currentUser.id,
       username,
@@ -285,6 +301,15 @@ async function ensureProfileRecord() {
       is_admin: isAdmin(currentUser),
     },
   ]).select();
+
+  if (error) {
+    if (error.message?.includes("Could not find the table") || error.message?.includes("public.profiles")) {
+      profilesTableMissing = true;
+      console.warn("Profile-Tabelle fehlt:", error.message);
+      return;
+    }
+    console.warn("Profil-Datensatz konnte nicht gespeichert werden:", error.message);
+  }
 }
 
 async function refreshUploadSection() {
@@ -511,9 +536,19 @@ async function loadAdminUploads() {
 
 async function loadAdminUsers() {
   adminUsers.innerHTML = "<p class='form-message'>Lade Benutzer...</p>";
+  if (profilesTableMissing) {
+    adminUsers.innerHTML = "<p class='form-message'>Profil-Tabelle fehlt. Führe supabase-setup.sql aus.</p>";
+    return;
+  }
+
   const { data, error } = await supabaseClient.from("profiles").select("id,username,email,created_at").order("created_at", { ascending: false });
 
   if (error) {
+    if (error.message?.includes("Could not find the table") || error.message?.includes("public.profiles")) {
+      profilesTableMissing = true;
+      adminUsers.innerHTML = "<p class='form-message'>Profil-Tabelle fehlt. Führe supabase-setup.sql aus.</p>";
+      return;
+    }
     adminUsers.innerHTML = `<p class='form-message'>Benutzer können nicht geladen werden: ${error.message}</p>`;
     return;
   }
