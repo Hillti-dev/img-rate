@@ -372,11 +372,17 @@ async function getImageUrl(path) {
   }
 
   const { data, error } = await supabaseClient.storage.from("images").getPublicUrl(path);
-  if (error || !data?.publicUrl) {
-    console.warn("Konnte URL nicht erstellen:", error?.message);
-    return null;
+  if (!error && data?.publicUrl) {
+    return data.publicUrl;
   }
-  return data.publicUrl;
+
+  if (error) {
+    console.warn("Konnte URL nicht erstellen:", error.message);
+  } else {
+    console.warn("Keine Public-URL zurückgegeben für", path);
+  }
+
+  return `${SUPABASE_URL}/storage/v1/object/public/images/${encodeURIComponent(path)}`;
 }
 
 function renderUploadsList(uploads) {
@@ -411,16 +417,30 @@ async function handleUploadsClick(event) {
 }
 
 async function deleteUpload(path) {
-  if (!currentUser || !path) return;
-  const { error } = await supabaseClient.storage.from("images").remove([path]);
-  if (error) {
-    console.warn("Upload konnte nicht gelöscht werden:", error.message);
-    return;
+  if (!currentUser || !path) {
+    setUploadMessage("Löschen nicht möglich: nicht angemeldet oder Pfad fehlt.", true);
+    return false;
   }
 
-  await supabaseClient.from("image_uploads").delete().eq("image_path", path);
+  const { error: storageError } = await supabaseClient.storage.from("images").remove([path]);
+  if (storageError) {
+    console.warn("Upload konnte nicht gelöscht werden:", storageError.message);
+    setUploadMessage("Löschen fehlgeschlagen (Storage): " + (storageError.message || "Unbekannter Fehler"), true);
+    return false;
+  }
+
+  const { error: metaError } = await supabaseClient.from("image_uploads").delete().eq("image_path", path);
+  if (metaError) {
+    console.warn("Upload-Metadaten konnten nicht gelöscht werden:", metaError.message);
+    setUploadMessage("Löschen fehlgeschlagen (Metadaten): " + (metaError.message || "Unbekannter Fehler"), true);
+    // continue to refresh lists even if metadata deletion failed
+  } else {
+    setUploadMessage("Upload gelöscht.");
+  }
+
   await refreshUploadSection();
   await refreshImageSource();
+  return true;
 }
 
 async function handleUpload(event) {
