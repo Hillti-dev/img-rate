@@ -364,9 +364,16 @@ async function fetchGalleryUploads() {
 }
 
 async function getImageUrl(path) {
+  const { data: signedData, error: signedError } = await supabaseClient.storage
+    .from("images")
+    .createSignedUrl(path, 3600);
+  if (!signedError && signedData?.signedUrl) {
+    return signedData.signedUrl;
+  }
+
   const { data, error } = await supabaseClient.storage.from("images").getPublicUrl(path);
   if (error || !data?.publicUrl) {
-    console.warn("Konnte public URL nicht erstellen:", error?.message);
+    console.warn("Konnte URL nicht erstellen:", error?.message);
     return null;
   }
   return data.publicUrl;

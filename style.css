@@ -208,20 +208,22 @@ h1 {
 .overlay {
     position: fixed;
     inset: 0;
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
     background: rgba(0, 0, 0, 0.72);
-    padding: 20px;
+    padding: 20px 20px 40px;
     z-index: 20;
-    overflow: auto;
+    overflow-y: auto;
 }
 
 .auth-panel,
 .admin-panel,
 .settings-panel {
     width: min(100%, 520px);
-    max-height: calc(100vh - 40px);
+    max-height: calc(100vh - 60px);
     overflow: auto;
+    min-height: 0;
 }
 
 .upload-section {
@@ -259,8 +261,9 @@ h1 {
     display: grid;
     gap: 14px;
     max-height: 55vh;
-    overflow: auto;
+    overflow-y: auto;
     padding-right: 6px;
+    min-height: 0;
 }
 
 .upload-card,
@@ -354,7 +357,7 @@ h1 {
     border-radius: 28px;
     border: 1px solid var(--border);
     box-shadow: 0 30px 80px rgba(0,0,0,0.24);
-    overflow: hidden;
+    overflow: auto;
 }
 
 .admin-section {
