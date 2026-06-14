@@ -318,7 +318,7 @@ async function refreshImageSource() {
 async function fetchGalleryUploads() {
   const { data, error } = await supabaseClient
     .from("image_uploads")
-    .select("image_path, file_name, created_at, username, email, user_id");
+    .select("image_path, image_url, file_name, created_at, username, email, user_id");
 
   if (error) {
     console.warn("Upload-Metadaten konnten nicht geladen werden:", error.message);
@@ -330,20 +330,22 @@ async function fetchGalleryUploads() {
   for (const row of data || []) {
     const filePath = row.image_path;
     const fileName = row.file_name || filePath.split("/").pop();
-    let url = null;
+    let url = row.image_url || null;
 
-    const { data: signedUrlData, error: signError } = await supabaseClient.storage
-      .from("images")
-      .createSignedUrl(filePath, 3600);
-
-    if (!signError && signedUrlData?.signedUrl) {
-      url = signedUrlData.signedUrl;
-    } else {
-      const { data: publicUrlData, error: publicError } = supabaseClient.storage
+    if (!url) {
+      const { data: signedUrlData, error: signError } = await supabaseClient.storage
         .from("images")
-        .getPublicUrl(filePath);
-      if (!publicError && publicUrlData?.publicUrl) {
-        url = publicUrlData.publicUrl;
+        .createSignedUrl(filePath, 3600);
+
+      if (!signError && signedUrlData?.signedUrl) {
+        url = signedUrlData.signedUrl;
+      } else {
+        const { data: publicUrlData, error: publicError } = supabaseClient.storage
+          .from("images")
+          .getPublicUrl(filePath);
+        if (!publicError && publicUrlData?.publicUrl) {
+          url = publicUrlData.publicUrl;
+        }
       }
     }
 
@@ -359,6 +361,15 @@ async function fetchGalleryUploads() {
   }
 
   return uploads;
+}
+
+async function getImageUrl(path) {
+  const { data, error } = await supabaseClient.storage.from("images").getPublicUrl(path);
+  if (error || !data?.publicUrl) {
+    console.warn("Konnte public URL nicht erstellen:", error?.message);
+    return null;
+  }
+  return data.publicUrl;
 }
 
 function renderUploadsList(uploads) {
@@ -445,12 +456,14 @@ async function handleUpload(event) {
     return;
   }
 
+  const publicUrl = await getImageUrl(path);
   const { error: insertError } = await supabaseClient.from("image_uploads").insert([
     {
       user_id: currentUser.id,
       username: currentUser.user_metadata?.username || null,
       email: currentUser.email,
       image_path: path,
+      image_url: publicUrl,
       file_name: filename,
     },
   ]);
