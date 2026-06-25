@@ -1,6 +1,10 @@
 const SUPABASE_URL = "https://jennmnnidwsfkujphsfc.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Implbm5tbm5pZHdzZmt1anBoc2ZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMTU4MzAsImV4cCI6MjA5Njg5MTgzMH0.tRWDnQz0jaUjcRYUQLCM1rEg1sFmv0smxXHqQ298UbY";
 
+if (!window.supabase) {
+  console.error("Supabase SDK ist nicht geladen. Prüfe das Script in index.html oder die GitHub Pages Umgebung.");
+}
+
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const localImages = [
