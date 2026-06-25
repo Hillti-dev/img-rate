@@ -22,6 +22,7 @@ const imageEl = document.getElementById("image");
 const imageCaption = document.getElementById("imageCaption");
 const avgRatingEl = document.getElementById("avgRating");
 const ratingInfo = document.getElementById("ratingInfo");
+const ratingMessage = document.getElementById("ratingMessage");
 const prevBtn = document.getElementById("prevBtn");
 const nextBtn = document.getElementById("nextBtn");
 const settingsBtn = document.getElementById("settingsBtn");
@@ -48,11 +49,16 @@ const adminOverlay = document.getElementById("adminOverlay");
 const closeAdmin = document.getElementById("closeAdmin");
 const adminUploads = document.getElementById("adminUploads");
 const adminUsers = document.getElementById("adminUsers");
+const adminMessage = document.getElementById("adminMessage");
 
 let uploadMetaDisabled = false;
 let ratingTableMissing = false;
 let profilesTableMissing = false;
 let fallbackUploads = [];
+
+
+
+
 
 function isAdmin(user = currentUser) {
   const username = user?.user_metadata?.username;
@@ -68,6 +74,20 @@ function setUploadMessage(message, isError = false) {
   uploadMessage.textContent = message;
   uploadMessage.style.color = isError ? "#ffb3b3" : "#c9c18c";
   uploadMessage.classList.toggle("hidden", !message);
+}
+
+function setAdminMessage(message, isError = false) {
+  if (!adminMessage) return;
+  adminMessage.textContent = message;
+  adminMessage.style.color = isError ? "#ffb3b3" : "#c9c18c";
+  adminMessage.classList.toggle("hidden", !message);
+}
+
+function setRatingMessage(message, isError = false) {
+  if (!ratingMessage) return;
+  ratingMessage.textContent = message;
+  ratingMessage.style.color = isError ? "#ffb3b3" : "#c9c18c";
+  ratingMessage.classList.toggle("hidden", !message);
 }
 
 function openSettings() {
@@ -164,11 +184,19 @@ function attachEventHandlers() {
   });
 
   imageEl.addEventListener("load", () => {
+    console.log("✓ Bild erfolgreich geladen:", imageEl.src);
     imageCaption.textContent = currentImage?.name || "Bild geladen";
   });
 
   imageEl.addEventListener("error", () => {
-    imageCaption.textContent = "Dieses Bild kann hier nicht angezeigt werden. Bitte konvertiere es zu JPG oder PNG.";
+    console.error("✗ Bild konnte nicht geladen werden:", imageEl.src);
+    console.log("Bild Details:", {
+      name: currentImage?.name,
+      url: currentImage?.url,
+      path: currentImage?.path,
+      storage: currentImage?.storage
+    });
+    imageCaption.textContent = `Fehler beim Laden: ${currentImage?.url || currentImage?.path || "keine URL gefunden"}`;
   });
 
   uploadsList.addEventListener("click", handleUploadsClick);
@@ -363,6 +391,49 @@ async function fetchGalleryUploads() {
   return uploads;
 }
 
+async function fetchUserUploads() {
+  if (!currentUser) return [];
+
+  const { data, error } = await supabaseClient
+    .from("image_uploads")
+    .select("image_path, image_url, file_name, created_at, username, email, user_id")
+    .eq("user_id", currentUser.id)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.warn("Benutzer-Uploads konnten nicht geladen werden:", error.message);
+    setUploadMessage("Eigene Uploads können nicht geladen werden: " + (error.message || "Fehler"), true);
+    return [];
+  }
+
+  const uploads = [];
+  for (const row of data || []) {
+    const filePath = row.image_path;
+    const fileName = row.file_name || filePath.split("/").pop();
+    let url = row.image_url || null;
+
+    if (!url) {
+      try {
+        url = await getImageUrl(filePath);
+      } catch (e) {
+        console.warn("Konnte URL für Benutzer-Upload nicht erstellen:", e?.message || e);
+      }
+    }
+
+    if (!url) continue;
+
+    uploads.push({
+      name: fileName,
+      path: filePath,
+      url,
+      storage: true,
+      uploader: row.username || row.email || row.user_id || "Unbekannt",
+    });
+  }
+
+  return uploads;
+}
+
 async function getImageUrl(path) {
   const { data: signedData, error: signedError } = await supabaseClient.storage
     .from("images")
@@ -378,8 +449,10 @@ async function getImageUrl(path) {
 
   if (error) {
     console.warn("Konnte URL nicht erstellen:", error.message);
+    setUploadMessage("Konnte Bild-URL nicht erstellen: " + (error.message || "Fehler"), true);
   } else {
     console.warn("Keine Public-URL zurückgegeben für", path);
+    setUploadMessage("Keine Public-URL für: " + path, true);
   }
 
   return `${SUPABASE_URL}/storage/v1/object/public/images/${encodeURIComponent(path)}`;
@@ -522,7 +595,13 @@ async function handleAdminUploadsClick(event) {
   const button = event.target.closest(".admin-delete");
   if (!button) return;
   const path = button.dataset.path;
-  await deleteUpload(path);
+  setAdminMessage("");
+  const ok = await deleteUpload(path);
+  if (!ok) {
+    setAdminMessage("Löschen fehlgeschlagen. Details siehe Upload-Bereich.", true);
+  } else {
+    setAdminMessage("Upload gelöscht.");
+  }
   await loadAdminDashboard();
 }
 
@@ -561,6 +640,7 @@ async function loadAdminDashboard() {
 }
 
 async function loadAdminUploads() {
+  setAdminMessage("");
   adminUploads.innerHTML = "<p class='form-message'>Lade Uploads...</p>";
   const { data, error } = await supabaseClient
     .from("image_uploads")
@@ -605,6 +685,7 @@ async function loadAdminUploads() {
 }
 
 async function loadAdminUsers() {
+  setAdminMessage("");
   adminUsers.innerHTML = "<p class='form-message'>Lade Benutzer...</p>";
   if (profilesTableMissing) {
     adminUsers.innerHTML = "<p class='form-message'>Profil-Tabelle fehlt. Führe supabase-setup.sql aus.</p>";
@@ -673,7 +754,15 @@ function pushHistory(image) {
 
 async function showImage(image) {
   currentImage = image;
-  imageEl.src = image.url || image.path;
+  const sourceUrl = image.url || image.path;
+  console.log("Lade Bild:", {
+    name: image.name,
+    url: image.url,
+    path: image.path,
+    source: sourceUrl,
+    storage: image.storage
+  });
+  imageEl.src = sourceUrl;
   imageCaption.textContent = "Bild wird geladen…";
   await loadRating();
   updateNavButtons();
@@ -703,10 +792,37 @@ function previousImage() {
 }
 
 async function loadRating() {
-  const rating = ratings[currentImage?.path] || 0;
+  let rating = ratings[currentImage?.path] || 0;
+  if (currentUser && !rating && !ratingTableMissing) {
+    rating = await loadUserRating(currentImage?.path);
+  }
+  ratings[currentImage?.path] = rating;
   updateStars(rating);
   updateRatingDisplay(rating);
   await loadAverageRating();
+}
+
+async function loadUserRating(path) {
+  if (!path || !currentUser || ratingTableMissing) {
+    return 0;
+  }
+
+  const { data, error } = await supabaseClient
+    .from("image_ratings")
+    .select("rating")
+    .eq("user_id", currentUser.id)
+    .eq("image_path", path)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    if (error.message?.includes("Could not find the table") || error.message?.includes("table 'public.image_ratings'")) {
+      ratingTableMissing = true;
+    }
+    return 0;
+  }
+
+  return data?.rating || 0;
 }
 
 function updateStars(rating) {
@@ -772,7 +888,44 @@ async function saveRating(ratingValue) {
       updateRatingDisplay(rating);
       return;
     }
+
+    if (error.message?.includes("no unique or exclusion constraint matching the ON CONFLICT specification")) {
+      console.warn("Kein passender Unique-Constraint gefunden, verwende Fallback-Update.");
+      try {
+        const { data: existing, error: fetchError } = await supabaseClient.from("image_ratings")
+          .select("id")
+          .eq("user_id", currentUser.id)
+          .eq("image_path", currentImage.path)
+          .limit(1)
+          .maybeSingle();
+
+        if (fetchError && !fetchError.message?.includes("Results contain 0 rows")) {
+          throw fetchError;
+        }
+
+        if (existing?.id) {
+          const { error: updateError } = await supabaseClient.from("image_ratings").update({ rating }).eq("id", existing.id);
+          if (updateError) throw updateError;
+        } else {
+          const { error: insertError } = await supabaseClient.from("image_ratings").insert({
+            user_id: currentUser.id,
+            image_path: currentImage.path,
+            rating,
+          });
+          if (insertError) throw insertError;
+        }
+
+        updateStars(rating);
+        updateRatingDisplay(rating);
+        await loadAverageRating();
+        return;
+      } catch (fallbackError) {
+        console.warn("Fallback zum Speichern der Bewertung fehlgeschlagen:", fallbackError.message || fallbackError);
+      }
+    }
+
     console.warn("Bewertung konnte nicht gespeichert werden:", error.message);
+    setRatingMessage("Bewertung konnte nicht gespeichert werden: " + (error.message || "Fehler"), true);
     return;
   }
 
